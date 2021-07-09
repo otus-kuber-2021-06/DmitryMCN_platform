@@ -1,6 +1,7 @@
+# DmitryMCN_platform
+DmitryMCN Platform repository
 <details>
-<summary>
-HomeWork №1</summary>
+<summary>HomeWork №1</summary>
 
 ### Настройка локального окружения:
 - Установка kubectl
@@ -32,4 +33,40 @@ kubectl apply -f frontend-pod-healthy.yaml
 ### Задание со \*:
 > Запуск микросервиса frontend, исправление ошибки при старте пода.
 - Под frontend не запускается, в логах ошибка `'panic: environment variable "PRODUCT_CATALOG_SERVICE_ADDR" not set'`. Добавляем необходимые переменные.
+</details>
+
+<details>
+<summary>HomeWork №2</summary>
+
+### Настройка локального окружения:
+- Запуск кластера kind
+### Что было сделано
+- Учимся запускать поды с помощью контроллеров k8s. Попробовал в деле ReplicaSet, Deployment и DaemonSet.
+Контроллеры используют селекторы по меткам (labels) для создания и управления подами. С помощью ReplicaSet можно быстро увеличить/уменьшить (scale) кол-во необходимых реплик пода.
+Контроллер Deployment использует ReplicaSet для более гибкого управления подами. Например он позволяет управлять стратегией развертывания. Можно сделать откат в случае проблем (команда rollout undo).
+DaemonSet запускает по одному экземпляру пода на каждой ноде.
+- Подготовлен манифест для запуска node-exporter на всех нодах кластера.
+> ReplicaSet. Определите, что необходимо добавить в манифест, исправьте его и примените вновь. 
+- Не хватает селектора для меток (missing required field "selector" in io.k8s.api.apps.v1.ReplicaSetSpec) и переменных сервиса
+> Почему обновление ReplicaSet не повлекло обновление запущенных pod?
+- ReplicaSet поддерживает нужное кол-во подов, но не следит за обновлением их конфигурации.
+> Найдите способ модернизировать свой DaemonSet таким образом, чтобы Node Exporter был развернут как на master, так и на worker нодах.
+- Используем св-во tolerations: operator: "Exists"
+### Как запустить проект:
+- В директории kubernetes-controllers выполнить:
+<pre>
+kubectl apply -f frontend-deployment.yaml
+kubectl apply -f paymentservice-deployment.yaml
+</pre>
+### Как проверить работоспособность:
+<pre>kubectl get deploy,rs,po</pre>
+### Задание со \*:
+Запускаем деплой Node Exporter:
+<pre>kubectl apply -f node-exporter-daemonset.yaml</pre>
+- В манифесте мы сперва создаем namespace "monitoring", service account и role. Роль связывается с service account с помощью объекта rolebinding. Далее создаем daemonset.
+- Проверяем, что node-exporter отдает метрики:
+<pre>
+kubectl port-forward <имя любого pod в DaemonSet>
+curl localhost:9100/metrics
+</pre>
 </details>

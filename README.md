@@ -70,3 +70,24 @@ kubectl port-forward <имя любого pod в DaemonSet>
 curl localhost:9100/metrics
 </pre>
 </details>
+
+<details>
+<summary>HomeWork №3</summary>
+
+### Что было сделано
+Созданы service accounts с различными правами в рамках кластера.
+### Как запустить проект:
+- В директории kubernetes-security выполнить:
+<pre>
+kubectl apply -f task01/ 
+kubectl apply -f task02/
+kubectl apply -f task03/
+</pre>
+### Как проверить работоспособность:
+<pre>
+kubectl auth can-i get po -n kube-system --as system:serviceaccount:default:bob
+kubectl auth can-i create po -n dev --as system:serviceaccount:dev:jane
+kubectl auth can-i get po -n dev --as system:serviceaccount:dev:ken
+kubectl auth can-i create po -n dev --as system:serviceaccount:dev:ken
+</pre>
+</details>

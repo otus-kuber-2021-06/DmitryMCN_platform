@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paymentservice
+  labels:
+    app: paymentservice
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: paymentservice
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 10%
+  template:
+    metadata:
+      labels:
+        app: paymentservice
+        version: v0.2
+    spec:
+      containers:
+      - name: paymentservice
+        image: dmitry79/paymentservice:0.2

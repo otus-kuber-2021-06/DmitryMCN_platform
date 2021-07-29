@@ -284,3 +284,18 @@ curl -k https://172.17.255.1/canary/
 curl -H 'test-header: true' -k https://172.17.255.1/canary/
 </pre>
 </details>
+
+<details>
+<summary>HomeWork №5</summary>
+
+### Что было сделано
+#### Добавлены манифесты для StatefulSet с Minio. Авторизационные данные перемещены в secrets.
+> Поместите данные в secrets и настройте конфигурацию на их использование.
+- Кодируем переменные в base64, редактируем и применяем манифесты.
+<pre>
+echo -n 'minio' | base64
+echo -n 'minio123' | base64
+kubectl apply -f minio-secret.yaml
+kubectl apply -f minio-statefulset.yaml
+</pre>
+</details>

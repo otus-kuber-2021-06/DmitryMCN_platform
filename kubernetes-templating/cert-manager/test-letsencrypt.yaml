@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Namespace
+metadata: 
+  name: cert-manager-test
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: letsencrypt-cert
+  namespace: cert-manager-test
+spec:
+  dnsNames:
+    - "34.66.149.53.nip.io"
+  secretName: letsencrypt-cert-tls
+  issuerRef:
+    name: letsencrypt-issuer

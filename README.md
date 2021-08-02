@@ -299,3 +299,62 @@ kubectl apply -f minio-secret.yaml
 kubectl apply -f minio-statefulset.yaml
 </pre>
 </details>
+
+<details>
+<summary>HomeWork №6</summary>
+
+### Что было сделано
+####
+- Устанавливаем helm chart cert-manager. Проверяем, что все работает корректно по инструкции https://cert-manager.io/docs/installation/verify/
+<pre>
+kubectl apply -f cert-manager/test-resources.yaml
+kubectl describe certificate -n cert-manager-test
+</pre>
+<pre>
+...
+Events:
+...
+ Normal  Issuing    18s   cert-manager  The certificate has been successfully issued
+</pre>
+> Изучите cert-manager, и определите, что еще требуется установить для корректной работы
+Смотрим документацию:
+> The first thing you’ll need to configure after you’ve installed cert-manager is an issuer which you can then use to issue certificates.
+Создаем ACME issuer Let's Encrypt. Сделаем его глобальным для кластера (kind: ClusterIssuer).
+<pre>
+kubectl apply -f cert-manager/cluster-issuer.yaml
+</pre>
+- Устанавливаем helm chart chartmuseum. Проверим, что release chartmuseum установился
+<pre>
+helm ls -n chartmuseum
+</pre>
+Проверяем в браузере - сертификат валиден.
+
+Создаем Service account https://cloud.google.com/docs/authentication/getting-started
+
+export GOOGLE_APPLICATION_CREDENTIALS=$HOME/sustained-vial-321511-74daedfac94f.json
+	pip3 install --upgrade google-cloud-storage
+
+Создаем google storage bucket https://cloud.google.com/storage/docs/creating-buckets
+Качаем бинарь chartmuseum и запускаем локально
+curl -LO https://s3.amazonaws.com/chartmuseum/release/latest/bin/linux/amd64/chartmuseum
+chartmuseum --debug --port=8080   --storage="google"   --storage-google-bucket="my-gcs-chartmuseum-bucket"   --storage-google-prefix=""
+
+2021-08-01T19:55:10.962+0300	DEBUG	Fetching chart list from storage	{"repo": ""}
+2021-08-01T19:55:11.164+0300	DEBUG	No change detected between cache and storage	{"repo": ""}
+2021-08-01T19:55:11.164+0300	INFO	Starting ChartMuseum	{"port": 8080}
+
+Устанавливаем плагин helm-push https://github.com/chartmuseum/helm-push
+
+Пушим тестовый чарт
+helm push frontend/ chartmuseum
+Pushing frontend-0.1.0.tgz to chartmuseum...
+Done.
+
+Проверяем, что чарт доступен в репозитории
+curl http://localhost:8080/api/charts
+{"frontend":[{"name":"frontend","version":"0.1.0","description":"A Helm chart for Kubernetes","apiVersion":"v2","appVersion":"1.16.0","type":"application","urls":["charts/frontend-0.1.0.tgz"],"created":"2021-08-01T16:57:36.577Z","digest":"844d3afde2d58b3534e1b85d9ab26059d33a69ad65c44a415dda41d6b5479eda"}]}
+
+Устанавливаем чарт в кластер
+
+
+</details>

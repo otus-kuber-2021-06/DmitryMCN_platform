@@ -328,6 +328,7 @@ kubectl apply -f cert-manager/cluster-issuer.yaml
 helm ls -n chartmuseum
 </pre>
 Проверяем в браузере - сертификат валиден.
+![CERT](https://raw.githubusercontent.com/otus-kuber-2021-06/DmitryMCN_platform/kubernetes-templating/cert.png)
 
 Создаем Service account https://cloud.google.com/docs/authentication/getting-started
 
@@ -343,7 +344,8 @@ chartmuseum --debug --port=8080   --storage="google"   --storage-google-bucket="
 2021-08-01T19:55:11.164+0300	DEBUG	No change detected between cache and storage	{"repo": ""}
 2021-08-01T19:55:11.164+0300	INFO	Starting ChartMuseum	{"port": 8080}
 
-Устанавливаем плагин helm-push https://github.com/chartmuseum/helm-push
+Устанавливаем плагин helm-push https://github.com/chartmuseum/helm-push. Добавляем репозиторий
+helm repo add chartmuseum http://localhost:8080
 
 Пушим тестовый чарт
 helm push frontend/ chartmuseum
@@ -355,6 +357,27 @@ curl http://localhost:8080/api/charts
 {"frontend":[{"name":"frontend","version":"0.1.0","description":"A Helm chart for Kubernetes","apiVersion":"v2","appVersion":"1.16.0","type":"application","urls":["charts/frontend-0.1.0.tgz"],"created":"2021-08-01T16:57:36.577Z","digest":"844d3afde2d58b3534e1b85d9ab26059d33a69ad65c44a415dda41d6b5479eda"}]}
 
 Устанавливаем чарт в кластер
+helm install frontend chartmuseum/frontend --create-namespace -n dev
+W0802 12:28:35.421029 3175311 warnings.go:70] networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+W0802 12:28:37.557695 3175311 warnings.go:70] networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
+NAME: frontend
+LAST DEPLOYED: Mon Aug  2 12:28:34 2021
+NAMESPACE: dev
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+kubectl get po -n dev
+NAME                         READY   STATUS    RESTARTS   AGE
+front-end-7b8bcd59cb-hlhnv   1/1     Running   0          37s
+
+Удаляем чарт и ns
+helm uninstall frontend -n dev && kubectl delete ns dev
+
+
+helm repo add harbor https://helm.goharbor.io
+kubectl create ns harbor
+helm install harbor harbor/harbor --wait --namespace=harbor --version=1.1.2 -f kubernetes-templating/harbor/values.yaml
 
 
 </details>

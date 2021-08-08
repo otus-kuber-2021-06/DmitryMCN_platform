@@ -328,7 +328,7 @@ kubectl apply -f cert-manager/cluster-issuer.yaml
 helm ls -n chartmuseum
 </pre>
 Проверяем в браузере - сертификат валиден.
-![CERT](https://raw.githubusercontent.com/otus-kuber-2021-06/DmitryMCN_platform/kubernetes-templating/cert.png)
+![CERT1](https://raw.githubusercontent.com/otus-kuber-2021-06/DmitryMCN_platform/kubernetes-templating/cert.png)
 
 Создаем Service account https://cloud.google.com/docs/authentication/getting-started
 
@@ -374,10 +374,25 @@ front-end-7b8bcd59cb-hlhnv   1/1     Running   0          37s
 Удаляем чарт и ns
 helm uninstall frontend -n dev && kubectl delete ns dev
 
-
+- Устанавливаем helm chart harbor.
 helm repo add harbor https://helm.goharbor.io
 kubectl create ns harbor
-helm install harbor harbor/harbor --wait --namespace=harbor --version=1.1.2 -f kubernetes-templating/harbor/values.yaml
+helm install harbor harbor/harbor --wait --namespace=harbor -f kubernetes-templating/harbor/values.yaml
 
+NAME: harbor
+LAST DEPLOYED: Sat Aug  7 16:04:12 2021
+NAMESPACE: harbor
+STATUS: deployed
+REVISION: 1
+TEST SUITE: None
+
+Проверяем в браузере - сертификат валиден.
+![CERT2](https://raw.githubusercontent.com/otus-kuber-2021-06/DmitryMCN_platform/kubernetes-templating/harbor-cert.png)
+
+- Создаем свой helm chart. Устанавливаем и проверяем работу UI.
+kubectl port-forward -n hipster-shop frontend-5c6dcc58c-mkm4v 8080:8080
+
+helm secrets upgrade --install hipster-shop kubernetes-templating/frontend --namespace hipster-shop -f kubernetes-templating/frontend/values.yaml -f kubernetes-templating/frontend/secrets.yaml
+kubectl get secret secret -n hipster-shop -o yaml
 
 </details>

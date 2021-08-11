@@ -23,10 +23,9 @@ version: 0.1.0
 # It is recommended to use it with quotes.
 appVersion: "1.16.0"
 dependencies:
- - name: frontend
-   version: 0.1.0
-   repository: "file://../frontend"
-dependencies:
+- name: frontend
+  version: 0.1.0
+  repository: "file://../frontend"
 - name: redis
   version: 14.8.8
   repository: https://charts.bitnami.com/bitnami

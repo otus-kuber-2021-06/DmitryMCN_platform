@@ -304,16 +304,22 @@ kubectl apply -f minio-statefulset.yaml
 <summary>HomeWork №6</summary>
 
 ### Что было сделано
-####
+#### * Создан k8s кластер в GCP.
+#### * Установлены helm чарты nginx-ingress, cert-manager, chartmuseum, harbor.
+#### * Создание helm чарта для приложения hipster-shop, шаблонизация, helm-secrets.
+#### * Работа с утилитой Kubecfg.
+#### * Инструмент Kustomize.
+
+### Cert-manager
+
 - Устанавливаем helm chart cert-manager. Проверяем, что все работает корректно по инструкции https://cert-manager.io/docs/installation/verify/
 <pre>
-kubectl apply -f cert-manager/test-resources.yaml
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set installCRDs=true
+kubectl apply -f kubernetes-templating/cert-manager/test-resources.yaml
 kubectl describe certificate -n cert-manager-test
 </pre>
 <pre>
-...
 Events:
-...
  Normal  Issuing    18s   cert-manager  The certificate has been successfully issued
 </pre>
 > Изучите cert-manager, и определите, что еще требуется установить для корректной работы
@@ -321,42 +327,56 @@ Events:
 > The first thing you’ll need to configure after you’ve installed cert-manager is an issuer which you can then use to issue certificates.
 Создаем ACME issuer Let's Encrypt. Сделаем его глобальным для кластера (kind: ClusterIssuer).
 <pre>
-kubectl apply -f cert-manager/cluster-issuer.yaml
+kubectl apply -f kubernetes-templating/cert-manager/cluster-issuer.yaml
 </pre>
+
+### Chartmuseum
+
 - Устанавливаем helm chart chartmuseum. Проверим, что release chartmuseum установился
 <pre>
+helm upgrade --install chartmuseum stable/chartmuseum --wait --namespace=chartmuseum -f kubernetes-templating/chartmuseum/values.yaml
 helm ls -n chartmuseum
 </pre>
 Проверяем в браузере - сертификат валиден.
-![CERT1](https://raw.githubusercontent.com/otus-kuber-2021-06/DmitryMCN_platform/kubernetes-templating/cert.png)
+![CHARTMUSEUM-CERT](https://github.com/otus-kuber-2021-06/DmitryMCN_platform/blob/kubernetes-templating/kubernetes-templating/chartmuseum-cert.png?raw=true)
 
-Создаем Service account https://cloud.google.com/docs/authentication/getting-started
+Далее нужно выполнить ряд действий в GCP:
 
-export GOOGLE_APPLICATION_CREDENTIALS=$HOME/sustained-vial-321511-74daedfac94f.json
-	pip3 install --upgrade google-cloud-storage
+Создаем Service account (см .https://cloud.google.com/docs/authentication/getting-started)
+> export GOOGLE_APPLICATION_CREDENTIALS=$HOME/sustained-vial-321511-74daedfac94f.json
 
-Создаем google storage bucket https://cloud.google.com/storage/docs/creating-buckets
-Качаем бинарь chartmuseum и запускаем локально
+Создаем google storage bucket (см. https://cloud.google.com/storage/docs/creating-buckets)
+
+Качаем бинарь chartmuseum и запускаем
+<pre>
 curl -LO https://s3.amazonaws.com/chartmuseum/release/latest/bin/linux/amd64/chartmuseum
 chartmuseum --debug --port=8080   --storage="google"   --storage-google-bucket="my-gcs-chartmuseum-bucket"   --storage-google-prefix=""
 
 2021-08-01T19:55:10.962+0300	DEBUG	Fetching chart list from storage	{"repo": ""}
 2021-08-01T19:55:11.164+0300	DEBUG	No change detected between cache and storage	{"repo": ""}
 2021-08-01T19:55:11.164+0300	INFO	Starting ChartMuseum	{"port": 8080}
+</pre>
 
-Устанавливаем плагин helm-push https://github.com/chartmuseum/helm-push. Добавляем репозиторий
+Далее устанавливаем плагин helm-push https://github.com/chartmuseum/helm-push. Добавляем репозиторий
+<pre>
 helm repo add chartmuseum http://localhost:8080
+</pre>
 
 Пушим тестовый чарт
+<pre>
 helm push frontend/ chartmuseum
 Pushing frontend-0.1.0.tgz to chartmuseum...
 Done.
+</pre>
 
 Проверяем, что чарт доступен в репозитории
+<pre>
 curl http://localhost:8080/api/charts
 {"frontend":[{"name":"frontend","version":"0.1.0","description":"A Helm chart for Kubernetes","apiVersion":"v2","appVersion":"1.16.0","type":"application","urls":["charts/frontend-0.1.0.tgz"],"created":"2021-08-01T16:57:36.577Z","digest":"844d3afde2d58b3534e1b85d9ab26059d33a69ad65c44a415dda41d6b5479eda"}]}
+</pre>
 
 Устанавливаем чарт в кластер
+<pre>
 helm install frontend chartmuseum/frontend --create-namespace -n dev
 W0802 12:28:35.421029 3175311 warnings.go:70] networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
 W0802 12:28:37.557695 3175311 warnings.go:70] networking.k8s.io/v1beta1 Ingress is deprecated in v1.19+, unavailable in v1.22+; use networking.k8s.io/v1 Ingress
@@ -370,11 +390,17 @@ TEST SUITE: None
 kubectl get po -n dev
 NAME                         READY   STATUS    RESTARTS   AGE
 front-end-7b8bcd59cb-hlhnv   1/1     Running   0          37s
+</pre>
 
 Удаляем чарт и ns
+<pre>
 helm uninstall frontend -n dev && kubectl delete ns dev
+</pre>
+
+### Harbor
 
 - Устанавливаем helm chart harbor.
+<pre>
 helm repo add harbor https://helm.goharbor.io
 kubectl create ns harbor
 helm install harbor harbor/harbor --wait --namespace=harbor -f kubernetes-templating/harbor/values.yaml
@@ -385,14 +411,78 @@ NAMESPACE: harbor
 STATUS: deployed
 REVISION: 1
 TEST SUITE: None
+</pre>
 
 Проверяем в браузере - сертификат валиден.
-![CERT2](https://raw.githubusercontent.com/otus-kuber-2021-06/DmitryMCN_platform/kubernetes-templating/harbor-cert.png)
+![HARBOR-CERT](https://github.com/otus-kuber-2021-06/DmitryMCN_platform/blob/kubernetes-templating/kubernetes-templating/harbor-cert.jpeg?raw=true)
 
+#### * Создание helm чарта для приложения hipster-shop, шаблонизация, helm-secrets.
 - Создаем свой helm chart. Устанавливаем и проверяем работу UI.
+<pre>
 kubectl port-forward -n hipster-shop frontend-5c6dcc58c-mkm4v 8080:8080
+</pre>
 
-helm secrets upgrade --install hipster-shop kubernetes-templating/frontend --namespace hipster-shop -f kubernetes-templating/frontend/values.yaml -f kubernetes-templating/frontend/secrets.yaml
+- Устанавливаем плагин helm-secrets, добавляем секрет для приложения frontend
+<pre>
+helm plugin install https://github.com/jkroepke/helm-secrets --version v3.8.2
+helm secrets upgrade --install frontend kubernetes-templating/frontend --namespace hipster-shop -f kubernetes-templating/frontend/values.yaml -f kubernetes-templating/frontend/secrets.yaml
 kubectl get secret secret -n hipster-shop -o yaml
+</pre>
+
+> Поместите все получившиеся helm chart's в ваш установленный harbor в публичный проект.
+Добавляем registry, пушим чарты
+<pre>
+helm registry login harbor.34.66.149.53.nip.io
+
+helm chart save kubernetes-templating/frontend/ harbor.34.66.149.53.nip.io/templating/frontend:0.0.1
+ref:     harbor.34.66.149.53.nip.io/templating/frontend:0.0.1
+digest:  eccb93986c0c9a63b7fe0a5449ab56d564697fa379f5392a1e8e16ab2e230c9b
+size:    2.7 KiB
+name:    frontend
+version: 0.1.0
+0.0.1: saved
+
+helm chart push harbor.34.66.149.53.nip.io/templating/frontend:0.0.1
+The push refers to repository [harbor.34.66.149.53.nip.io/templating/frontend]
+ref:     harbor.34.66.149.53.nip.io/templating/frontend:0.0.1
+digest:  a8b6da66d26c14f51778663a59e95e33b6475cc4b67f3e10ebc07c06dbe3ec4c
+size:    2.7 KiB
+name:    frontend
+version: 0.1.0
+0.0.1: pushed to remote (1 layer, 2.7 KiB total)
+</pre>
+Тоже самое для hipster-shop. Теперь чарты доступны в хранилище.
+
+![HARBOR](https://github.com/otus-kuber-2021-06/DmitryMCN_platform/blob/kubernetes-templating/kubernetes-templating/harbor.png?raw=true)
+
+#### Работа с утилитой Kubecfg.
+
+Проверим, что манифесты генерируются корректно и установим их:
+<pre>
+kubecfg show services.jsonnet
+kubecfg update kubernetes-templating/kubecfg/services.jsonnet --namespace hipster-shop 
+INFO  Validating deployments paymentservice
+INFO  validate object "apps/v1, Kind=Deployment"
+INFO  Validating services paymentservice
+INFO  validate object "/v1, Kind=Service"
+INFO  Validating deployments shippingservice
+INFO  validate object "apps/v1, Kind=Deployment"
+INFO  Validating services shippingservice
+INFO  validate object "/v1, Kind=Service"
+INFO  Fetching schemas for 4 resources
+INFO  Creating services paymentservice
+INFO  Creating services shippingservice
+INFO  Creating deployments paymentservice
+INFO  Creating deployments shippingservice
+</pre>
+
+#### Инструмент Kustomize
+
+Проверка усстановки на выбранное окружение. В данном случае dev:
+<pre>
+kubectl apply --dry-run=server -k kubernetes-templating/kustomize/overrides/hipster-shop/
+service/dev-adservice created (server dry run)
+deployment.apps/dev-adservice created (server dry run)
+</pre>
 
 </details>

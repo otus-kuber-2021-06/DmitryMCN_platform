@@ -1,0 +1,13 @@
+containerPort: 8079
+
+service:
+  port: 80
+
+ingress:
+  enabled: true
+  annotations:
+    kubernetes.io/ingress.class: nginx
+  hosts:
+    - host: frontend.34.66.149.53.nip.io
+      paths:
+        - /

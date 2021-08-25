@@ -486,3 +486,132 @@ deployment.apps/dev-adservice created (server dry run)
 </pre>
 
 </details>
+
+<details>
+<summary>HomeWork №7</summary>
+
+### Что было сделано
+#### * Созданы CRD и СR.
+#### * Запущен оператор, который работает с данным СR.
+#### * Сделан деплой оператора в k8s.
+
+- Применяем манифест Custom Resource Definitions.
+<pre>
+$ kubectl apply -f deploy/crd.yml
+The CustomResourceDefinition "mysqls.otus.homework" is invalid: spec.versions[0].schema.openAPIV3Schema: Required value: schemas are required
+</pre>
+Получаем ошибку. Манифест устарел, в доументации указано:
+> With apiextensions.k8s.io/v1 the definition of a structural schema is mandatory for CustomResourceDefinitions
+
+Добавляем схему, деплоим повторно.
+
+> Задание: добавьте описание обязательный полей в CustomResourceDefinition. 
+
+Добавляем через блок required.
+
+> Вопрос: почему объект создался, хотя мы создали CR, до того, как запустили контроллер?
+
+Работает reconciliation loop: контроллер периодически получает актуальное состояние и сравнивает его с желаемым
+
+> Добавьте в README вывод комманды kubectl get jobs (там должны быть успешно выполненные backup и restore job)
+<pre>
+$ kubectl get jobs
+NAME                         COMPLETIONS   DURATION   AGE
+backup-mysql-instance-job    1/1           2s         2m11s
+restore-mysql-instance-job   1/1           20s        103s
+</pre>
+
+> Приложите вывод при запущенном MySQL:
+<pre>
+$ export MYSQLPOD=$(kubectl get pods -l app=mysql-instance -o jsonpath="{.items[\*].metadata.name}")
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+</pre>
+
+> Задание со \* (1). Исправить контроллер, чтобы он писал в status subresource
+
+Добавлен return для функции mysql_on_create
+
+<pre>
+$ kubectl describe mysqls.otus.homework mysql-instance | grep -A 2 Status
+Status:
+  mysql_on_create:
+    Message:  mysql-instance created with restore-job
+</pre>
+
+> Задание со \* (2).
+> Добавить в контроллер логику обработки изменений CR. Например, реализовать смену пароля от MySQL. Показать, что код работает
+
+Пример:
+<pre>
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+</pre>
+Меняем пароль в CR MySQL
+<pre>
+$ kubectl patch ms --type=merge mysql-instance -p '{"spec":{"password":"otuspassword555"}}'
+mysql.otus.homework/mysql-instance patched
+</pre>
+Делаем еще один select со старым паролем.
+<pre>
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
+ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: YES)
+command terminated with exit code 1
+</pre>
+И теперь с новым
+<pre>
+$ kubectl exec -it $MYSQLPOD -- mysql -potuspassword555 -e "select * from test;" otus-database
+mysql: [Warning] Using a password on the command line interface can be insecure.
++----+-------------+
+| id | name        |
++----+-------------+
+|  1 | some data   |
+|  2 | some data-2 |
++----+-------------+
+</pre>
+> Объяснить, что он делает
+
+Оператор использует фреймворк Kopf. Добавляем обработчик для обновления нашего кастомного ресурса: <b>@kopf.on.update('otus.homework', 'v1', 'mysqls')</b>. (см. https://kopf.readthedocs.io/en/latest/walkthrough/updates). В функции необходимые параметры получаем из дополнительных агрументов ** kwargs. Если пароль не менялся (например в CR менялось что-то другое), то выходим по return. Если пароль изменился забираем список подов в данном ns фильтруя по label_selector. В цикле идем по нужным подам и меняем пароль с помощью функции stream из модуля kubernetes
+@kopf.on.update('otus.homework', 'v1', 'mysqls')
+<pre>
+# Функция, которая будет запускаться при изменении объектов тип MySQL
+# Умеет менять только пароль для всех подов CustomResource
+def mysql_on_update(spec, status, namespace, logger, **kwargs):
+    name = kwargs['name']
+    try:
+        old_password = kwargs['old']['spec']['password']
+        new_password = kwargs['new']['spec']['password']
+        if new_password == old_password:
+            return
+    except kopf.PermanentError("Password must be set"):
+        return
+    api = kubernetes.client.CoreV1Api()
+    pods = api.list_namespaced_pod(namespace=namespace, label_selector='app='+name).items
+    for pod in pods:
+        name = pod.metadata.name
+        exec_command = [
+            '/bin/sh',
+            '-c',
+            'mysql -p'+old_password+' -e "ALTER USER \'root\'@\'localhost\' IDENTIFIED BY \''+new_password+'\'"']
+        resp = stream(api.connect_get_namespaced_pod_exec,
+                      name,
+                      namespace,
+                      command=exec_command,
+                      stderr=True, stdin=False,
+                      stdout=True, tty=False)
+        print("Response: " + resp)
+</pre>
+</details>

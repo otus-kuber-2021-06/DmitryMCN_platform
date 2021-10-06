@@ -615,3 +615,49 @@ def mysql_on_update(spec, status, namespace, logger, **kwargs):
         print("Response: " + resp)
 </pre>
 </details>
+
+<details>
+<summary>HomeWork №8</summary>
+
+### Что было сделано
+#### Собран образ nginx с модулем stub_status. Созданы манифесты deployment, service и servicemonitor для nginx и nginx exporter.
+- Ставим prometheus-operator через  kubectl apply из офф. репозитория
+<pre>
+kubectl apply -f https://github.com/prometheus-operator/prometheus-operator/blob/master/bundle.yaml?raw=true
+customresourcedefinition.apiextensions.k8s.io/alertmanagerconfigs.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/alertmanagers.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/podmonitors.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/probes.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/prometheuses.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/prometheusrules.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/servicemonitors.monitoring.coreos.com created
+customresourcedefinition.apiextensions.k8s.io/thanosrulers.monitoring.coreos.com created
+clusterrolebinding.rbac.authorization.k8s.io/prometheus-operator created
+clusterrole.rbac.authorization.k8s.io/prometheus-operator created
+deployment.apps/prometheus-operator created
+serviceaccount/prometheus-operator created
+service/prometheus-operator created
+</pre>
+
+- Создаем образ nginx, в конфиге задействуем stub_status.
+<pre>
+cd kubernetes-monitoring/nginx/
+docker build -t nginx_stub:0.0.1 .
+</pre>
+
+- Собираем контейнер с nginx exporter.
+<pre>
+git clone https://github.com/nginxinc/nginx-prometheus-exporter
+make container
+</pre>
+
+- Используем его как sidecar для пода c nginx. Применяем манифесты, проверям, что метрики доступны.
+<pre>
+cd kubernetes-monitoring/temlates/
+kubectl apply -f nginx_stub_deploy.yaml 
+kubectl apply -f nginx_stub_svc.yaml 
+kubectl apply -f nginx_stub_servicemonitor.yaml
+kubectl exec -ti nginx-7d88fb5c6-r2zdt -- /bin/bash
+curl http://localhost:9113/metrics
+</pre>
+</details>

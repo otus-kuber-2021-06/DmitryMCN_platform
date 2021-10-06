@@ -1,0 +1,12 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: nginx-stub-svc
+  labels:
+    app: nginx-stub
+spec:
+  selector:
+    app: nginx-stub
+  ports:
+  - name: metrics
+    port: 9113

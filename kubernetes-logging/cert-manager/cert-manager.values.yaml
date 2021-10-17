@@ -1,0 +1,25 @@
+nodeSelector:
+  cloud.google.com/gke-nodepool: infra-pool
+tolerations:
+  - key: node-role
+    operator: Equal
+    value: infra
+    effect: NoSchedule
+
+webhook:
+  nodeSelector:
+    cloud.google.com/gke-nodepool: infra-pool
+  tolerations:
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+
+cainjector:
+  nodeSelector:
+    cloud.google.com/gke-nodepool: infra-pool
+  tolerations:
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule

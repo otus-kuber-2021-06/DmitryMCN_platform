@@ -661,3 +661,87 @@ kubectl exec -ti nginx-7d88fb5c6-r2zdt -- /bin/bash
 curl http://localhost:9113/metrics
 </pre>
 </details>
+
+<details>
+<summary>HomeWork №9</summary>
+
+### Что было сделано
+#### * Создан кластер в GKE.
+#### * Установлен hipstershop, Развернут EFK стек.
+#### * Установлены helm-чарты cert-manager, nginx-ingress, kube-prometheus-stack
+#### * Созданы дашборды с визулизацией
+#### * https://kibana.104.154.89.14.nip.io/
+#### * https://prometheus.104.154.89.14.nip.io/
+#### * https://grafana.104.154.89.14.nip.io/
+
+- Создал кластер в GCP с 4 нодами (1 нода default-pool, 3 ноды infra-pool)
+В default-pool рвзвернут hipstershop, все остальное работает в infra-pool.
+- Ставим helm-чарт cert-manager.
+<pre>
+kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/v1.5.4/cert-manager.crds.yaml
+helm install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.5.4
+kubectl apply -f kubernetes-logging/cert-manager/cluster-issuer.yaml
+</pre>
+
+- И nginx-ingress
+<pre>
+helm upgrade --install nginx-ingress stable/nginx-ingress --wait --namespace=nginx-ingress -f nginx-ingress.values.yaml
+</pre>
+
+- Дальше ставим EFK
+<pre>
+helm upgrade --install elasticsearch elastic/elasticsearch --namespace observability -f elasticsearch.values.yaml
+</pre>
+Получаем ошибку
+> Error: UPGRADE FAILED: template: elasticsearch/templates/statefulset.yaml:298:27: executing "elasticsearch/templates/statefulset.yaml" at <.Values.roles.master>: can't evaluate field master in type interface {}
+
+Исправляем (https://stackoverflow.com/questions/67837291/elasticsearch-installation-in-helm-fails-with-statefulset-error)
+
+Поды с эластиком работают на нодах инфры
+<pre>
+kubectl get pods -o wide -n observability -l app=elasticsearch-master
+NAME                     READY   STATUS    RESTARTS   AGE     IP         NODE                                     NOMINATED NODE   READINESS GATES
+elasticsearch-master-0   1/1     Running   0          2d23h   10.4.1.6   gke-cluster-1-infra-pool-2aeade7d-s91l   <none>           <none>
+elasticsearch-master-1   1/1     Running   0          2d23h   10.4.3.5   gke-cluster-1-infra-pool-2aeade7d-d1wj   <none>           <none>
+elasticsearch-master-2   1/1     Running   0          5d2h    10.4.2.6   gke-cluster-1-infra-pool-2aeade7d-88l8   <none>           <none>
+</pre>
+
+> Причину можно найти в логах pod с Fluent Bit, он пытается обработать JSON, отдаваемый приложением, и находит там дублирующиеся поля time и timestamp
+
+Не понял, о какой проблеме речь. В логах пода с Fluent Bit ошибок не увидел. Указаный issue давно закрыт, возможно проблема уже исправлена.
+
+- Задание со \*. Предложите более элегантное решение в контексте конкретной ситуации и реализуйте его
+
+Решение предложено в одном из коментариев к issue https://github.com/fluent/fluent-bit/issues/628
+
+> If you are in Kubernetes, use the option Merge_Log_Key in your Kubernetes filter, so your unpacked data will be under that new key, avoiding duplicates if any:
+
+Столкнулся с проблемой парсинга. В лог попадал не корректный json вида: "log": "2021-10-16T11:59:48.051Z stdout F {\"context\":{". Проблема описана тут https://github.com/helm/charts/issues/10424
+Добавил новый parser для fluent-bit
+
+- Далее ставим kube-prometheus-stack и elasticsearch-exporter:
+<pre>
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace=observability
+helm upgrade --install elasticsearch-exporter stable/elasticsearch-exporter --set es.uri=http://elasticsearch-master:9200 --set serviceMonitor.enabled=true --namespace=observability
+</pre>
+
+Достаем дефолтный пароль на grafana:
+<pre>
+kubectl get secret kube-prometheus-stack-grafana -n observability -o jsonpath='{.data.admin-password}' | base64 --decode
+</pre>
+
+По умолчанию prometheus-оператор не поддерживает annotation-based discovery of services. И данные в дашборде эластика я не увидел. Добавил ключи:
+
+> serviceMonitorSelectorNilUsesHelmValues: false
+> podMonitorSelectorNilUsesHelmValues: false
+
+- Обновляем чарт:
+<pre>
+helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack --namespace=observability -f prometheus.values.yaml
+</pre>
+
+- Создал дэшборд с визуализацией в Kibana, выгрузил его в export.ndjson
+- Установил loki, добавив его как additionalDataSources для Графаны. Создал дэшборд в grafana с графами и логами nginx-ingress, выгрузил в nginx-ingress.json.
+</details>
